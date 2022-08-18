@@ -1,0 +1,16 @@
+COTS control strat',3
+COTS reefs2cull strat',14
+COTS cull surrounding',0
+COTS control boats',5
+COTS survey boats,0
+COTS cull days',90
+COTS cull voyages',10
+COTS survey voyages,0
+calculate effort,2
+COTS top reef picks',1
+COTS fixed list',0
+listFileName',1
+COTS CSIRO control type',1
+COTS global trigger',0
+COTS reef trigger',0
+COTS start control,23

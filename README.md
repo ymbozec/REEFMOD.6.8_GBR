@@ -10,5 +10,7 @@ The model reconstructs coral trajectories across the GBR between 2008-2022 and f
 
 This version also simulates the CoTS control program in space and time from 2019 onwards, with a specific number of boats (default: 5 boats) and the list of priority reefs as currently (2021) defined by GBRMPA.
 
+Yves-Marie Bozec, The University of Queensland (y.bozec@uq.edu.au)
+
 Citation: Bozec, Y.-M., K. Hock, R. A. Mason, M. E. Baird, C. Castro-Sanguino, S. A. Condie, M. Puotinen, A. Thompson, and P. J. Mumby. 2022. Cumulative impacts across Australia’s Great Barrier Reef: A mechanistic evaluation. Ecological Monographs 92(1), e01494
 https://esajournals.onlinelibrary.wiley.com/doi/abs/10.1002/ecm.1494

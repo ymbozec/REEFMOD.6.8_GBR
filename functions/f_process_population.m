@@ -165,8 +165,6 @@ algal_cm2(overshoot<0,1) = algal_cm2(overshoot<0,1) - overshoot(overshoot<0) ;
 % Reduce EAM first (if available)
 algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1) = algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1)...
     - overshoot(overshoot>0 & algal_cm2(:,1)>0) ;
-algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1) = algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1)...
-    - overshoot(overshoot>0 & algal_cm2(:,1)>0) ;
 algal_cm2(algal_cm2(:,1)<0,1)=0; % turn negatives into 0!
 % Update overshoot
 overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
@@ -175,7 +173,7 @@ algal_cm2(overshoot>0 & algal_cm2(:,4)>0,4) = algal_cm2(overshoot>0 & algal_cm2(
     - overshoot(overshoot>0 & algal_cm2(:,4)>0) ;
 algal_cm2(algal_cm2(:,4)<0,4)=0; % turn negatives into 0!
 % Update overshoot
-overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
+% overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
 
  
 % % IF OVERSHOOT IS NEGATIVE -> fill the empty space with EAM

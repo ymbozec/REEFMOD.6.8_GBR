@@ -20,13 +20,13 @@ substrate_env_cm2= substrate_SA_cm2(environ(:,2)) + substrate_SA_cm2(environ(:,3
 % Simulate algal dynamics
 for t=1:ALGAL.nb_step_algal_dynamics
     
-    actual_algal_consumpt_pct = f_algal_removal(algal_cm2, algal_removal, ALGAL.feeding_prefs, sum(cell_area_cm2)) ;
-    % actual_algal_consumpt_pct gives the total amount (in %) of each alga to be removed based on their availability
+    actual_algal_consump = f_algal_removal(algal_cm2, algal_removal, ALGAL.feeding_prefs, sum(cell_area_cm2)) ;
+    % actual_algal_consumption gives the total amount of each alga (as proportional area) to be removed based on their availability
     % Note that REEF.substrate_SA_cm2 is the surface area of the substrate underneath live corals
     % -> we use now the actual surface area of the reef instead of the planar area (META.total_area_cm2)
 
     % Converts in total amount of cm2 algae that can be consumed
-    max_fish_consump = actual_algal_consumpt_pct*sum(cell_area_cm2);
+    max_fish_consump = actual_algal_consump*sum(cell_area_cm2);
     
     %%%%%%%%%%%%%%%%%% Set up grazing for every cell %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     r = uint16(randperm(length(list_cell)));  % randomize the order of cell to visit

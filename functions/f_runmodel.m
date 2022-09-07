@@ -228,7 +228,7 @@ for n = 1:META.nb_reefs % This must be done for every reef before time simulatio
         % Was previously in f_hurricane_effect.m. See script for definition of parameters
         a = -3e-007;
         k_cat5 = 0.0551-a*((0.0007/(-2*a))^2);
-        relHurrMort = [0.0461 0.1183 0.2504 0.5677 1]; %e.g. a cat 4 has 57% of the impact as a cat 5
+        relHurrMort = [0.0461 0.1183 0.2504 0.5677 1]; %e.g. a cat 4 has 57% of the impact of a cat 5
         
         for t0=1:2:META.nb_time_steps
             
@@ -644,19 +644,20 @@ for t = 1:META.nb_time_steps
             % months COTS is above threshold for disease (ie, above outbreak threshold)
             if RESULT.COTS_adult_densities(n,t) >= META.COTS_density_threshold_for_disease
                     
-                % If that the case, track recent history of that density
+                % If that the case, set outbreak duration (fixed for all reefs or at random for this reef and time step)
                 if length(META.COTS_outbreak_duration)>1
                     COTS_outbreak_duration = randi(META.COTS_outbreak_duration); % in years
                 else
                     COTS_outbreak_duration = META.COTS_outbreak_duration;
                 end
                 
-                % Process die-back if outbreak has lasted the max duration
-                if t > 2*COTS_outbreak_duration+1
+                % Track adult density over the set outbreak duration
+                if t > 2*COTS_outbreak_duration+1 % (prevents looking too far back at the start of the run)
                     
 %                     COTS_density_history = sum(RESULT.COTS_all_densities(n,(t-COTS_outbreak_duration*2):t,3:end),3);
                     COTS_density_history = RESULT.COTS_adult_densities(n,(t-COTS_outbreak_duration*2):t);
                     
+                    % Process die-back due to disease
                     if min(COTS_density_history)>= META.COTS_density_threshold_for_disease
                         % if COTS have been above the outbreak density threshold over the tested period
                         % then population crashes due to disease - just leave CoTS recruits

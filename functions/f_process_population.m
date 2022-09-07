@@ -6,7 +6,7 @@
 % July 2018: genetic adaptation (thermal) integrated into natural mortality
 % -------------------------------------------------------------------------
 
-function [coral, algal, genes, last_surface_area_grazed] = f_process_population (coral, algal, genes, season, algal_removal, META, REEF, CORAL, ALGAL, SST_diff)
+function [coral, algal, genes, last_surface_area_grazed] = f_process_population (coral, algal, genes, season, algal_removal, META, REEFn, CORAL, ALGAL, SST_diff)
 
 % This function processes all neighbourhood type interactions and succession for every cell
 % in the grid once and once only. All the cells are processed simultaneously (vectorisation).
@@ -47,13 +47,13 @@ coral_env_cm2 = total_coral_cm2(environ(:,1)) + ...
     total_coral_cm2(environ(:,2)) + total_coral_cm2(environ(:,3)) + ...
     total_coral_cm2(environ(:,4)) + total_coral_cm2(environ(:,5)) ;
 
-coral_env_cm2(REEF.grazable_cell==0)=0;
+coral_env_cm2(REEFn.grazable_cell==0)=0;
 
 % Proportion of coral cover over 5 cells
 % From now we work out the effect of actual surface area
-substrate_env_cm2=REEF.substrate_SA_cm2(environ(:,1)) + ...
-    REEF.substrate_SA_cm2(environ(:,2)) + REEF.substrate_SA_cm2(environ(:,3)) + ...
-    REEF.substrate_SA_cm2(environ(:,4)) + REEF.substrate_SA_cm2(environ(:,5)) ;
+substrate_env_cm2 = REEFn.substrate_SA_cm2(environ(:,1)) + ...
+    REEFn.substrate_SA_cm2(environ(:,2)) + REEFn.substrate_SA_cm2(environ(:,3)) + ...
+    REEFn.substrate_SA_cm2(environ(:,4)) + REEFn.substrate_SA_cm2(environ(:,5)) ;
 coral_env_prop = coral_env_cm2./substrate_env_cm2 ;
 
 % Neighborhood coral cover limit macroalgal growth 
@@ -73,13 +73,15 @@ coral_reduce_macrogrowth = coral_env_prop*ALGAL.coral_reduce_macrogrowth ;
 % PROCESS ALGAE
 %_________________________________________________________________________________________
 % First determine which cells are fully grazable, i.e. outside Liagora canopies
-grazable_cell = REEF.grazable_cell;
+all_cell_areas_cm2 = REEFn.substrate_SA_cm2 ;
+all_cell_areas_cm2(REEFn.grazable_cell==0)= 0;
 
 [algal_cm2,last_surface_area_grazed] = f_algal_dynamics(algal_removal, ALGAL, total_coral_cm2, algal_cm2, ...
-    coral_reduce_macrogrowth, ALGAL.growth_rate, REEF.substrate_SA_cm2, META.convert_to_canopy ,season, REEF.dictyota_declines_seasonally,grazable_cell,REEF.substrate_SA_cm2,environ);
+    coral_reduce_macrogrowth, ALGAL.growth_rate, all_cell_areas_cm2, META.convert_to_canopy ,season, ...
+    REEFn.dictyota_declines_seasonally,REEFn.grazable_cell, REEFn.substrate_SA_cm2, environ);
 
 % Re-estimate the new colocation of DICT and LOB (positive) % TO RE-VISIT!
-new_colocation_cm2 = max(sum(algal_cm2,2) + total_coral_cm2 - REEF.substrate_SA_cm2,0);
+new_colocation_cm2 = max(sum(algal_cm2,2) + total_coral_cm2 - all_cell_areas_cm2,0);
 
 % remove used objects 
 % clear coral_env_prop coral_reduce_macrogrowth  algal_env_cm2 coral_env_cm2
@@ -109,7 +111,7 @@ algal_env_cm2 = algal_cm2(environ(:,1),:) + ...
     algal_cm2(environ(:,2),:) + algal_cm2(environ(:,3),:) + ...
     algal_cm2(environ(:,4),:) + algal_cm2(environ(:,5),:) ;
 
-algal_env_cm2(REEF.grazable_cell==0)=0; %just to be sure there is no algae on sand
+algal_env_cm2(REEFn.grazable_cell==0)=0; %just to be sure there is no algae on sand
 
 % Calculate proportion of macroalgal cover over 5 cells
 lob_env_prop = algal_env_cm2(:,3)./substrate_env_cm2; % Proportion (prop) of lob cover over 5 cells
@@ -133,16 +135,16 @@ end
 % while available space should account for macroalgal cover
 % Here available space excludes lob and dict (but not thick turf)
 total_coral_cm2 = sum(coral_cm2.*id1,2) ; % update total coral cover in every cell
-avail_cell_areas_cm2 = REEF.substrate_SA_cm2 - sum(algal_cm2(:,2:3),2) + new_colocation_cm2 - total_coral_cm2; % Exclude thick turf -> can be overgrown by corals
-avail_cell_areas_cm2(REEF.grazable_cell==0)=0; % cannot grow on sand
+avail_cell_areas_cm2 = REEFn.substrate_SA_cm2 - sum(algal_cm2(:,2:3),2) + new_colocation_cm2 - total_coral_cm2; % Exclude thick turf -> can be overgrown by corals
+avail_cell_areas_cm2(REEFn.grazable_cell==0)=0; % cannot grow on sand
 
 % SST below is actually the difference between current SST and baseline SST for the reef
 [coral_cm2, genes] = f_coral_growth(coral_cm2, colony_ID, genes, species_ID, clade, macroalgal_env_prop, avail_cell_areas_cm2, ...
-    META.nb_coral_types, CORAL, ALGAL, META.doing_clades, META.doing_genetics, META.genetics, SST_diff, REEF.CORAL_juvenile_growth);
+    META.nb_coral_types, CORAL, ALGAL, META.doing_clades, META.doing_genetics, META.genetics, SST_diff, REEFn.CORAL_juvenile_growth);
 
 %%%%%%% 4) NATURAL MORTALITY   %%%%%%%%%%%%%%%%%%%%%%%%%
 % Includes now (27/08/13) partial and whole colony mortalities 
-[coral_cm2] = f_natural_mortality(coral_cm2, CORAL, REEF, species_ID, META.nb_coral_types);
+[coral_cm2] = f_natural_mortality(coral_cm2, CORAL, REEFn, species_ID, META.nb_coral_types);
 % coral_cm2_aft2 = coral_cm2;
 %_________________________________________________________________________________________
 %
@@ -151,11 +153,8 @@ avail_cell_areas_cm2(REEF.grazable_cell==0)=0; % cannot grow on sand
 
 % %%%%%%% Calculate overshoot for adjustment %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 id1(coral_cm2<0)=0;  % update the identity matrix of living colonies
-cell_area_cm2 = REEF.substrate_SA_cm2 ;
 
-cell_area_cm2(REEF.grazable_cell==0)= 0;
-
-overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
+overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - all_cell_areas_cm2 ;
 
 % NEGATIVE OVERSHOOT means sum of all covers < total space 
 % (essentially due to coral mortality that needs to be filled with EAM)
@@ -165,17 +164,15 @@ algal_cm2(overshoot<0,1) = algal_cm2(overshoot<0,1) - overshoot(overshoot<0) ;
 % Reduce EAM first (if available)
 algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1) = algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1)...
     - overshoot(overshoot>0 & algal_cm2(:,1)>0) ;
-algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1) = algal_cm2(overshoot>0 & algal_cm2(:,1)>0,1)...
-    - overshoot(overshoot>0 & algal_cm2(:,1)>0) ;
 algal_cm2(algal_cm2(:,1)<0,1)=0; % turn negatives into 0!
 % Update overshoot
-overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
+overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - all_cell_areas_cm2 ;
 % Then reduce TURF if we still have positive overshoot
 algal_cm2(overshoot>0 & algal_cm2(:,4)>0,4) = algal_cm2(overshoot>0 & algal_cm2(:,4)>0,4)...
     - overshoot(overshoot>0 & algal_cm2(:,4)>0) ;
 algal_cm2(algal_cm2(:,4)<0,4)=0; % turn negatives into 0!
 % Update overshoot
-overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
+% overshoot = sum(algal_cm2,2) + sum(coral_cm2.*id1,2) - new_colocation_cm2 - cell_area_cm2 ;
 
  
 % % IF OVERSHOOT IS NEGATIVE -> fill the empty space with EAM

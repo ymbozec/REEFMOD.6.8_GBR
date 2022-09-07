@@ -8,6 +8,8 @@
 
 function ALGALREMOVAL2 = f_algal_removal(algal_cm2, ALGALREMOVAL, algal_prefs, total_area_cm2)
 
+% ALGALREMOVAL is now estimated in f_runmodel
+% This is a vector of proportional areas of algae removed due to grazing
 
 total_algal_cm2 = sum(algal_cm2,1) ; % total cover of each algae over the whole grid
 

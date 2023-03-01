@@ -13,6 +13,7 @@
 %__________________________________________________________________________
 clear
 
+NB_SIMULATIONS = 20; % Number of repeated runs
 addpath(genpath('.'));
 SaveDir ='';
 

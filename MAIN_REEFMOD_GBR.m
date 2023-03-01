@@ -13,10 +13,10 @@
 %__________________________________________________________________________
 clear
 
+addpath(genpath('.'));
 SaveDir ='';
 
-NB_SIMULATIONS = 20; % Number of repeated runs
-
+ 
 % NB_TIME_STEPS has to be an even number <= 26+158 (length of projected DHW time series is 79 years)
 % We always run the hindcast (26 time steps) before future projections
 % Initialisation = winter 2007

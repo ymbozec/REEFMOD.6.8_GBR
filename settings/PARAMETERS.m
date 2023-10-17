@@ -240,6 +240,18 @@ CORAL.diam_bins = [2 ; 4 ; 14]; % in cm
 % Adolescents (cm):  5  9  13  17 (3 size classes)
 % Adults (cm): 17 31 45 59 73 87 101 (6 size classes)
 
+%% NEW (March 2023) - recording shelter volume provided by each colony
+% Following Urbina-Barreto et al (2021), parameters of the log-log relationships linking colony 2D area (cm2)
+% and shelter volume (dm3) for branching, tabular, columnar and massive shapes
+% sp1: branching, sp2: tabular, sp3: columnar, assumed similar for corymbose Acropora
+% sp4: columnar, assumed similar for poccilloporid (but see Urbina et al 2021)
+% sp5: massives, but slope is halved to account for encrusting shapes (no shelter)
+% sp6: massives
+CORAL.SV_a = [ 1.47 ; 1.50 ; 1.34 ; 1.34 ; 1.49/2 ; 1.49 ]; % slope
+CORAL.SV_b = [ -8.31 ;-8.32 ; -7.37 ; -7.37 ; -9.69 ; -9.69 ]; % intercept
+% Adding uncertainty (95% prediction intervals, calculated by Ryan Heneghan using the published data)
+% (put 0 to get deterministic estimates)
+CORAL.SV_rand = [0.514 ; 0.388 ; 0.561 ; 0.561 ; 0.603 ; 0.603]; 
 %__________________________________________________________________________________________
 %
 %       SET UP ALGAE - (FEB 2017) NEW PARAMETRISATION

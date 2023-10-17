@@ -162,8 +162,13 @@ varSDother = 0.2;
 init_rubble_cover = normrnd(init_rubble*100, varSDother*init_rubble*100, length(META.reef_ID), 1)/100 ;
 init_rubble_cover(init_rubble_cover<0.01) = 0.01;
 
-init_sand_cover = normrnd(init_sand*100, varSDother*init_sand*100, length(META.reef_ID), 1)/100 ;
+% init_sand_cover = normrnd(init_sand*100, varSDother*init_sand*100, length(META.reef_ID), 1)/100 ;
+% init_sand_cover(init_sand_cover<0.05) = 0.05;
+
+% Update Nov 2022: now sand determined by Roelfsema et al (2021)'s geomorphic and benthic maps
+init_sand_cover = normrnd(GBR_REEFS.UNGRAZABLE(META.reef_ID)*100, varSDother*GBR_REEFS.UNGRAZABLE(META.reef_ID)*100)/100 ;
 init_sand_cover(init_sand_cover<0.05) = 0.05;
+
 
 % Adjust if too high (coral + sand > 95%). We leave 5% free space for a safe intialisation
 CHECK = sum(init_coral_cover,2) + init_sand_cover;
@@ -224,31 +229,69 @@ if META.doing_genetics == 0 % NO ADAPTATION, NO THERMAL OPTIMUM
     
     %% PAST THERMAL STRESS REGIME 2008-2020
     % Using Coral Reef Watch 5km product: max DHW every year from 1985 to 2020 from closest 5x5 km pixel    
-    load('GBR_past_DHW_CRW_5km_1985_2020.mat') %
-    GBR_PAST_DHW = GBR_PAST_DHW(:,24:36); %select 2008 to 2020
-    
+%     load('GBR_past_DHW_CRW_5km_1985_2020.mat') %
+%     GBR_PAST_DHW = GBR_PAST_DHW(:,24:36); %select 2008 to 2020   
+    load('GBR_past_DHW_CRW_5km_1985_2022.mat') % updated NOAA-CRW with 2021 (no bleaching) and 2022 (bleaching)
+    GBR_PAST_DHW = GBR_PAST_DHW(:,24:38); %select 2008 to 2022
+  
     end_hindcast = size(GBR_PAST_DHW,2);
     DHW(:,1:2:end_hindcast*2) = GBR_PAST_DHW(META.reef_ID,:);
     clear GBR_PAST_DHW
     
-    %% Update Fed 2022: PATCH FOR 2021 and 2022 (no heat stress)
-    DHW(:,27:30) = zeros(length(META.reef_ID), 4) ;
+    %% FUTURE THERMAL STRESS (CMIP5)
+%     if META.nb_time_steps>30 % now starts in 2023
+%         
+%         % Load the selected forecast scenario of DHW
+%         load(['GBR_maxDHW_' char(OPTIONS.GCM) '_rcp' char(OPTIONS.RCP) '_2021_2099.mat'])
+%         
+%         if (META.nb_time_steps-30)/2 <= size(max_annual_DHW,2)
+%             DHW(:,31:2:end) = max_annual_DHW(META.reef_ID,2:(META.nb_time_steps-28)/2);
+%         else
+%             error('!!REEFMOD ERROR!! Simulated timeframe inconsistent with the DHW time-series. NB_TIME_STEPS has to be <= 26+158 (length of projected DHM time series is 79 years)')
+%         end
+%     end
     
-    %% FUTURE THERMAL STRESS  
-%     if META.nb_time_steps>26
-    if META.nb_time_steps>30 % now starts in 2023
+    %% FUTURE THERMAL STRESS (CMIP6)
+    if META.nb_time_steps > 30 
+        % Forecast starts in 2023 (step 31)
+        % The DHW matrices start in 2000 (column 6) so year 2023 is column 29       
         
         % Load the selected forecast scenario of DHW
-        load(['GBR_maxDHW_' char(OPTIONS.GCM) '_rcp' char(OPTIONS.RCP) '_2021_2099.mat'])
+        load([char(OPTIONS.GCM) '_' char(OPTIONS.SSP) '_annual_DHW_max.mat'])
         
-%         if (META.nb_time_steps-26)/2 <= size(max_annual_DHW,2)
-%             DHW(:,27:2:end) = max_annual_DHW(META.reef_ID,1:(META.nb_time_steps-26)/2); 
-        if (META.nb_time_steps-30)/2 <= size(max_annual_DHW,2)
-            DHW(:,31:2:end) = max_annual_DHW(META.reef_ID,2:(META.nb_time_steps-28)/2);
+        if META.nb_time_steps-30 > 2*size(max_annual_DHW(:,29:end),2)
+            
+            error('!!REEFMOD ERROR!! Simulated timeframe inconsistent with the DHW forecast. NB_TIME_STEPS has to be <= 30+156')
+
         else
-            error('!!REEFMOD ERROR!! Simulated timeframe inconsistent with the DHW time-series. NB_TIME_STEPS has to be <= 26+158 (length of projected DHM time series is 79 years)')
+            
+            % Select the specified timeframe in the available forecast
+            DHW_FORECAST = max_annual_DHW(META.reef_ID,29:(29+(META.nb_time_steps-32)/2));
+            % Let's shuffle available years within each decade
+            DHW_FORECAST_shuffled = nan(size(DHW_FORECAST));
+            start = 1; % first year of the selected forecast
+            remain = size(DHW_FORECAST,2); % number of years still available
+            
+            while remain > 10
+                
+                sample = randperm(10); % sample at random within the decade
+                DHW_FORECAST_shuffled(:,start:(start-1+length(sample)))= DHW_FORECAST(:,start-1+sample); % assign the shuffled years
+                start = start + length(sample);
+                remain = remain - length(sample);
+            end
+            
+            % Last years available to be shuffled as well (Less than a
+            % decade available)
+            sample = randperm(remain);
+            DHW_FORECAST_shuffled(:,start:(start-1+length(sample)))= DHW_FORECAST(:,start-1+sample);
+            
+            % Finally assign to the DHW matrix (only in summers)
+            DHW(:,31:2:end) = DHW_FORECAST_shuffled;
+
         end
     end
+    
+% For genetic simulations (CMIP5)   
 %     % First select the climate model
 %     climatemodel = 'CCSM4'
 %     dhw_method = 'Hotspot_0'

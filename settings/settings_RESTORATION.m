@@ -145,24 +145,24 @@ META.prop_enriched_larvae = [ 0.05  0.25  0.25  0.15  0.15  0.15]; % ~average pr
 META.total_nb_larvae = RESTORATION.total_nb_larvae ; % defined in MAIN
 
 % New way (March 2022)
-% META.enriched_species = zeros(1,META.nb_coral_types);
-% META.enriched_species(1:6)=1;
-% META.enriched_species_prop = [0.01 0.1 0.1 0.07 0.49 0.23]; % could use se of sample proportions sqrt(p*(1-p)/22), data from 22 quadrats
-% META.enriched_density = 6.8;
-% META.enrichment_density_variable = 0; % variable (1) or fixed (0) density (ie, not dependent on current coral cover) - set to 0 for the BCA
-% 
-% % size of coral larvae (as 1yr old corals) - use the same as outplants for now
-% META.enriched_coral_diameter_mean = RESTORATION.outplant_diameter_mean;
-% META.enriched_coral_diameter_sd = RESTORATION.outplant_diameter_sd;
+META.enriched_species = zeros(1,META.nb_coral_types);
+META.enriched_species(1:6)=1;
+META.enriched_species_prop = [0.01 0.1 0.1 0.07 0.49 0.23]; % could use se of sample proportions sqrt(p*(1-p)/22), data from 22 quadrats
+META.enriched_density = 6.8;
+META.enrichment_density_variable = 0; % variable (1) or fixed (0) density (ie, not dependent on current coral cover) - set to 0 for the BCA
+
+% size of coral larvae (as 1yr old corals) - use the same as outplants for now
+META.enriched_coral_diameter_mean = RESTORATION.outplant_diameter_mean;
+META.enriched_coral_diameter_sd = RESTORATION.outplant_diameter_sd;
 
 %% Extra scenario with enhanced corals at +2DHW, no tradeoff as 5% of the population
 %% SET thermal tolerance in MAIN with 'RESTORATION.DHW_tolerance_larvae'
-META.enriched_species = zeros(1,META.nb_coral_types);
-META.enriched_species(1:12)=1;
-META.enriched_species_prop = [0.95*[0.01 0.1 0.1 0.07 0.49 0.23] 0.05*[0.01 0.1 0.1 0.07 0.49 0.23]]; % could use se of sample proportions sqrt(p*(1-p)/22), data from 22 quadrats
-META.enriched_density = 6.8;
-META.enrichment_density_variable = 0; % variable (1) or fixed (0) density (ie, not dependent on current coral cover) - set to 0 for the BCA
-CORAL.sensitivity_bleaching(7:12) = CORAL.sensitivity_bleaching(7:12)*exp(-0.35*RESTORATION.DHW_tolerance_larvae);
+% META.enriched_species = zeros(1,META.nb_coral_types);
+% META.enriched_species(1:12)=1;
+% META.enriched_species_prop = [0.95*[0.01 0.1 0.1 0.07 0.49 0.23] 0.05*[0.01 0.1 0.1 0.07 0.49 0.23]]; % could use se of sample proportions sqrt(p*(1-p)/22), data from 22 quadrats
+% META.enriched_density = 6.8;
+% META.enrichment_density_variable = 0; % variable (1) or fixed (0) density (ie, not dependent on current coral cover) - set to 0 for the BCA
+% CORAL.sensitivity_bleaching(7:12) = CORAL.sensitivity_bleaching(7:12)*exp(-0.35*RESTORATION.DHW_tolerance_larvae);
 
 % size of coral larvae (as 1yr old corals) - use the same as outplants for now
 META.enriched_coral_diameter_mean = [RESTORATION.outplant_diameter_mean RESTORATION.outplant_diameter_mean];

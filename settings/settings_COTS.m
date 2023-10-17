@@ -84,7 +84,7 @@ META.COTS_immigration = 1e6*ones(1, META.nb_time_steps) ; % Forced larval input 
 
 % Parameter a of the B-H function (same for all reefs)
 META.COTS_BH_alpha = 4*1e4 ; % which is 100 settlers per m2 (before mortality)
-% Gives the following densities fro 200m-2:
+% Gives the following densities at equilibrium for a 200m-2 reef surface:
 % ~350 recruits (0-6 month old), ~71 juveniles (<15 cm), ~10 sub-adults (15–25 cm) and ~32 adults (>25 cm), 
 META.COTS_BH_beta = 0.5*1e7 ; % fitted to Lizard Is (Pratchett 2005)
 
@@ -123,27 +123,18 @@ end
 
 % Keep the two last predictions of pop structure -> first row = pop in summer, second = winter
 X = COTS_pop_init((end-1):end,:); 
-rel_X_sub_and_adults = X(:,3:end)./sum(X(:,3:end),2); 
+rel_X_sub_and_adults = zeros(size(X));
+rel_X_sub_and_adults(:,4:end) = X(:,4:end)./sum(X(:,4:end),2); 
 
 % Store for use during each season:
-META.COTS_init_age_distri_OUTBREAK = zeros(2,size(COTS_pop_init,2));
-% Correct for imperfect detectability from manta tow surveys
-META.COTS_init_age_distri_OUTBREAK(:,3:end) = rel_X_sub_and_adults./META.COTS_detectability(3:end);
-% Extrapolate the expected juveniles (class 2) in winter:
-META.COTS_init_age_distri_OUTBREAK(2,2) = X(2,2)*sum(META.COTS_init_age_distri_OUTBREAK(2,3:end));
+META.COTS_init_age_distri_OUTBREAK = rel_X_sub_and_adults;
+
 % Note: no recruits in winter; in summer, nb of recruits is estimated by the model from fecondation at
 % the previous time steps so here left blank
-
-% Store for use during each season:
-Xref = zeros(2,size(COTS_pop_init,2));
-META.COTS_ref_age_distri = zeros(2,size(COTS_pop_init,2));
-% Scale to an observed density of 1
-Xref(1,:) = X(1,:)/sum(X(1,META.COTS_detectability>0));
-Xref(2,:) = X(2,:)/sum(X(2,META.COTS_detectability>0));
-% Correct for imperfect detectability
-META.COTS_ref_age_distri(1,:) = Xref(1,:)/sum(Xref(1,3:end).*META.COTS_detectability(3:end));
-META.COTS_ref_age_distri(2,:) = Xref(2,:)/sum(Xref(2,3:end).*META.COTS_detectability(3:end));
-% This gives the density of representative CoTS pop for an observed total density of 1
+% Extrapolate the expected juveniles (class 2) in winter:
+META.COTS_init_age_distri_OUTBREAK(2,2) = rel_X_sub_and_adults(2,4)*X(2,2)/X(2,4);
+% Extrapolate the expected juveniles (class 3) in summer:
+META.COTS_init_age_distri_OUTBREAK(1,3) = rel_X_sub_and_adults(1,5)*X(1,3)/X(1,5);
 
 clear iter reef R1 R2 COTS_init_age_distri_INCIPIENT COTS_init_age_distri_OUTBREAK t n X rel_X_sub_and_adults temp COTS_pop_init
 clear COTS_ages Weights COTS_feeding_rate_summer COTS_feeding_rate_winter COTS_detectability COTS_6mo_mortalities

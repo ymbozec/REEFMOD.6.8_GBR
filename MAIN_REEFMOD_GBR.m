@@ -3,54 +3,81 @@
 % REEFMOD-GBR MAIN SCRIPT
 %
 % This is the clean version of 6.7 used for RRAP counterfactuals (Feb 2022) and interventions (Apr 2022).
-% Hindcast has been extended to 2022, assuming no severe bleaching & cyclones in 2021 and 2022.
-% Uses the latest available geomorphic maps (3D) for coral habitats (4 geomorphic classes).
+% Hindcast has been extended to 2022 with observed DHW (including 2022 bleaching event), assuming no cyclones in 2021 and 2022.
+% Uses the latest available geomorphic maps (3D) for coral habitats (4 geomorphic classes) with reef specific carrying capacity.
 % Enables the simulation of a specific region (with a proxy of larval input from excluded reefs).
 % Allows tracking corals on specific reef sites for restoration interventions.
-% The random generation of coral mortality due to bleaching and cyclones is now specific to run ID
+% The random generation of coral mortality due to bleaching and cyclones is now specific to run ID.
 %
-% Yves-Marie Bozec, y.bozec@uq.edu.au, 08/2022
+%
+%     • Aug 2022: → Reference code for the RME (ReefMod Explorer).
+%     • Sep 2022:
+% - corrections of little bugs in algal dynamics and removal.
+% - correction of the relationship between coral size and fecundity.
+% - counterfactual runs using CMIP5 (MIROC5) with above corrections
+% - working versions for Tina (CoTS control) and Liam (Palau)
+%     • Oct 2022:
+% - update past DHW with 2022 summer
+% - integrates DHW projections of five CMIP6 climate models
+%     • Nov 2022: 
+% - integration new geomorphic 3D reef areas + carrying capacity
+% - first CMIP6 counterfactuals (5 GCMs × 5 SSPs)
+%     • Feb 2023: 
+% - CMIP6 counterfactuals without CoTS (5 GCMs × 3 SSPs)
+% - CMIP6 counterfactuals without CoTS control (5 GCMs × 3 SSPs)
+%     • Mar 2023: implement calculation and tracking of shelter volume
+%
+% Yves-Marie Bozec, y.bozec@uq.edu.au, 06/2023
 %__________________________________________________________________________
 clear
 
 SaveDir ='';
 
-NB_SIMULATIONS = 20; % Number of repeated runs
+NB_SIMULATIONS = 2; % Number of repeated runs
 
-% NB_TIME_STEPS has to be an even number <= 26+158 (length of projected DHW time series is 79 years)
-% We always run the hindcast (26 time steps) before future projections
-% Initialisation = winter 2007
+% We always run the hindcast before future projections
+% Initialisation is winter 2007
 
 % NB_TIME_STEPS = 30; % HINDCAST: summer 2008 to winter 2022
-NB_TIME_STEPS = 26+60; % HINDCAST+FORECAST summer 2008 - winter 2050
-% NB_TIME_STEPS = 26+100; % HINDCAST+FORECAST summer 2008 - winter 2070
-% NB_TIME_STEPS = 26+158; % HINDCAST+FORECAST summer 2008 - winter 2099
+NB_TIME_STEPS = 30+156; % HINDCAST+FORECAST summer 2008 - winter 2100
 
-% OutputName = 'R0_FORECAST_GBR'; options = [1 1 1 1 0]; % see options below
-OutputName = 'R0_BCA_Moore'; options = [1 1 1 1 1]; % Counterfactual of the Business Case Assessment (35x35 grid cells)
+% OutputName = 'R0_HINDCAST_GBR'; options = [1 1 1 1 0]; % see options below
+OutputName = 'R0_GBR.6.8'; options = [1 1 1 1 0]; % see options below
+% OutputName = 'R0_BCA_Moore'; options = [1 1 1 1 1]; % Counterfactual of the Business Case Assessment (35x35 grid cells)
 % Requires turning ON restoration, outplanted_density = 0 (ie, deployment of zero coral) and the year of first (ghost) 
 % 'deployment' to keep track of intervention sites within reefs (ie, cells with deployment of zero coral) that are
 % the exact same as in the intervention scenarios
-% OutputName = 'R1_BCA_Moore'; options = [1 1 1 1 1]; % see options below
 
-% select the Global Circulation Model for climate change projection 
-GCM = 3; % 1=CCSM4, 2=CESM1_WACCM, 3=MIROC5, 4=GFDL_ESM2M, 5=HadGEM2, 6=GISS_E2_R
+%% select the Global Circulation Model for climate change projection
+%% OLD CMIP-5 GCMs:
+% GCM = 3; % 1=CCSM4, 2=CESM1_WACCM, 3=MIROC5, 4=GFDL_ESM2M, 5=HadGEM2, 6=GISS_E2_R
 % Select the carbon emission pathway
-RCP = 2; % 1=RCP2.6, 2=RCP4.5, 3=RCP6.0, 4=RCP8.5
+% RCP = 2; % 1=RCP2.6, 2=RCP4.5, 3=RCP6.0, 4=RCP8.5
+
+%% CMIP-6 GCMs (Oct 2022):
+GCM = 1; % 1=CNRM-ESM2-1, 2=EC-Earth3-Veg, 3=IPSL-CM6A-LR, 4=MRI-ESM2-0, 5=UKESM1-0-LL, 6= All models mixed
+SSP = 2; % 1= SSP1-1.9, 2=SSP1-2.6, 3=SSP2-4.5, 4=SSP3-7.0, 5=SSP5-8.5
 
 %% --------------------------------------------------------------------------------
-GCM_list=["CCSM4";"CESM1_WACCM";"MIROC5";"GFDL_ESM2M";"HadGEM2";"GISS_E2_R"];
-RCP_list = ["26"; "45"; "60"; "85"];
-OPTIONS.GCM = GCM_list(GCM);
-OPTIONS.RCP = RCP_list(RCP);
+%% OLD CMIP-5 GCMs:
+% GCM_list=["CCSM4";"CESM1_WACCM";"MIROC5";"GFDL_ESM2M";"HadGEM2";"GISS_E2_R"];
+% RCP_list = ["26"; "45"; "60"; "85"];
+% OPTIONS.GCM = GCM_list(GCM);
+% OPTIONS.RCP = RCP_list(RCP);
 
+% Climate forecasts from CMIP6 global circulation models
+All_GCMs = ["CNRM-ESM2-1" ; "EC-Earth3-Veg" ; "IPSL-CM6A-LR" ; "MRI-ESM2-0" ; "UKESM1-0-LL"];
+All_SSPs = ["119" ; "126" ; "245" ; "370" ; "585" ];
+OPTIONS.GCM = All_GCMs(GCM);
+OPTIONS.SSP = All_SSPs(SSP);
+    
 % Stressor options: yes(1)/no(0)
 OPTIONS.doing_cyclones = options(1);
 OPTIONS.doing_bleaching = options(2) ; 
 OPTIONS.doing_COTS = options(3);
 OPTIONS.doing_WQ = options(4);
 
-OPTIONS.doing_size_frequency = 1; % for tracking population size structure (incl. juveniles)
+OPTIONS.doing_size_frequency = 0; % for tracking population size structure (incl. juveniles)
 OPTIONS.doing_adaptation = 0 ;
 OPTIONS.adaptation_parms = [ 1 1 1.5 ]; % sigma cold/sigma hot/esd
 OPTIONS.doing_restoration = options(5) ;
@@ -69,6 +96,7 @@ OPTIONS.CoTS_control_scenarios = csvread('parsList2.csv', 0, 1);
 % Option names in parsList2.csv. Second value is spatial strategy (14: whole GBR under CoTS control).
 % Fourth value is number of boats (5)
 OPTIONS.CoTS_control_scenarios(4)=5;
+OPTIONS.CoTS_control_scenarios(16)=23; % When control starts - default is t=23 which is 2019
 
 %% Outplanting
 % Set the restoration effort: maximimum number of reefs where coral outplanting is undertaken at random at each time step
@@ -79,7 +107,7 @@ RESTORATION.nb_reefs_outplanted = Inf ;
 RESTORATION.total_nb_outplants = Inf; % Max number of outplants available for all reefs at each time step.
 % Set to Inf if outplant density is the driver
 
-RESTORATION.outplanted_density = 0;  %only in the case of fixed density of outplants (ignores RESTORATION.total_nb_outplants)
+RESTORATION.outplanted_density = 6.8;  %only in the case of fixed density of outplants (ignores RESTORATION.total_nb_outplants)
 
 RESTORATION.doing_coral_outplanting = zeros(1,NB_TIME_STEPS); % if zero, no coral deployment at time step for all reefs
 RESTORATION.doing_coral_outplanting(1,38:2:46) = 1 ; % set to 1 to indicate outplanting: first in summer 2026 and last in summer 2030 (BCA)
@@ -130,11 +158,28 @@ RESTORATION.doing_fogging = zeros(1,NB_TIME_STEPS); %if zero don't do fogging at
 RESTORATION.bleaching_mortality_under_fogging = 0.8 ; % fogging reduces bleaching mortality by 20%
 
 %% Saving options
-if NB_TIME_STEPS > 30   
-    OPTIONS.OutputFileName = [SaveDir OutputName '_' char(OPTIONS.GCM) '_' char(OPTIONS.RCP) '.mat'];
+% Previously using CMIP-5
+% if NB_TIME_STEPS > 30   
+%     OPTIONS.OutputFileName = [SaveDir OutputName '_' char(OPTIONS.GCM) '_' char(OPTIONS.RCP) '.mat'];
+% else
+%     OPTIONS.OutputFileName = [SaveDir OutputName '.mat'];
+% end
+
+% Now using CMIP-6
+if NB_TIME_STEPS > 30
+
+%     if length(unique(GCM_list))>1
+%         OPTIONS.OutputFileName = [SaveDir OutputName '_ALL_GCMs_' char(OPTIONS.SSP) '.mat'];
+%     else
+%         OPTIONS.OutputFileName = [SaveDir OutputName '_' char(All_GCMs(GCM)) char(OPTIONS.SSP) '.mat'];
+%     end
+    % Now 1 scenario = 1 GCM (allows maintaining the same seed for each GCM)
+    
+    OPTIONS.OutputFileName = [SaveDir OutputName '_SSP' char(OPTIONS.SSP) '_' char(All_GCMs(GCM)) '.mat'];
 else
     OPTIONS.OutputFileName = [SaveDir OutputName '.mat'];
 end
+
 
 %% --------------------------------------------------------------------------------
 OUTPUTS = struct('REEF', [],'RESULT', [],'RECORD', []);
@@ -165,7 +210,8 @@ coral_cover_per_taxa = zeros(NB_SIMULATIONS,META.nb_reefs,META.nb_time_steps+1,M
 coral_larval_supply = coral_cover_per_taxa;
 nb_coral_offspring = coral_cover_per_taxa;
 nb_coral_recruit = zeros(NB_SIMULATIONS,META.nb_reefs,META.nb_time_steps+1,META.nb_coral_types,'uint16');
-    
+total_shelter_volume_per_taxa = zeros(NB_SIMULATIONS,META.nb_reefs,META.nb_time_steps+1,META.nb_coral_types,'single');
+
 if OPTIONS.doing_size_frequency == 1   
     nb_coral_juv = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types, 2, 'uint16') ;
     nb_coral_adol = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types, 3, 'uint16') ;
@@ -208,7 +254,9 @@ macroUprightFleshy = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1,'
 % 6) CoTS outputs
 if OPTIONS.doing_COTS == 1
     COTS_mantatow = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, 'single');
-    COTS_densities0 = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, 16, 'single'); % 16 age classes
+    COTS_densities = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, 16, 'single'); % 16 age classes
+    COTS_predicted_densities = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, 16, 'single'); % 16 age classes
+    COTS_predicted_mantatow = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, 'single');
     COTS_settler_density = zeros(NB_SIMULATIONS, META.nb_reefs, META.nb_time_steps+1, 'uint16');
     COTS_larval_supply = COTS_mantatow;
     COTS_larval_output = COTS_mantatow;
@@ -227,6 +275,7 @@ for simul = 1:NB_SIMULATIONS
     coral_larval_supply(simul,:,:,:) = squeeze(cat(4,OUTPUTS(simul).RESULT.coral_larval_supply)); % nb of incoming larvae per unit of reef area (400m2)
     nb_coral_recruit(simul,:,:,:) = squeeze(cat(4,OUTPUTS(simul).RESULT.coral_settler_count));
     nb_coral_offspring(simul,:,:,:) = squeeze(cat(4,OUTPUTS(simul).RESULT.coral_total_fecundity)); % nb of larvae produced per unit of reef area (400m2)
+    total_shelter_volume_per_taxa(simul,:,:,:) = squeeze(cat(4,OUTPUTS(simul).RESULT.total_shelter_volume_per_taxa));
     
     if OPTIONS.doing_size_frequency == 1
         nb_coral_juv(simul,:,:,:,:)= squeeze(cat(4,OUTPUTS(simul).RESULT.coral_juv_count(:,:,:,:)));
@@ -264,28 +313,41 @@ for simul = 1:NB_SIMULATIONS
         % Assuming 0.6 CoTS per grid ~ 0.22 CoTS per tow
         % (0.22 per tow is equivalent to 1500 COTS per km2 (Moran & De'ath 92), so that 1 COTS per grid (400m2) is equivalent to 0.22*2500/1500
         COTS_mantatow(simul,:,:) = (0.22/0.6)*squeeze(cat(4,OUTPUTS(simul).RESULT.COTS_total_perceived_density));
-        COTS_densities0(simul,:,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_all_densities); % Density for 400m2
+        COTS_densities(simul,:,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_all_densities); % Density for 400m2
+        COTS_predicted_densities(simul,:,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_all_densities_predicted); % Density for 400m2
+        COTS_predicted_mantatow(simul,:,:) = (0.22/0.6)*squeeze(OUTPUTS(simul).RESULT.COTS_total_perceived_density_predicted);
+        
         COTS_settler_density(simul,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_settler_densities); % Density for 400m2
         COTS_larval_supply(simul,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_larval_supply); % Density for 400m2
         COTS_larval_output(simul,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_larval_output); % Density for 400m2
     end
     
-    if OPTIONS.doing_COTS_control == 1 && META.nb_time_steps > 23
+    if OPTIONS.doing_COTS_control == 1
         COTS_CONTROL_culled_reefs(simul,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_culled_reefs);
         COTS_CONTROL_remaining_dives(simul,:) = squeeze(OUTPUTS(simul).RESULT.COTS_control_remaining_dives);
         COTS_CONTROL_culled_density(simul,:,:) = squeeze(OUTPUTS(simul).RESULT.COTS_culled_density);
-    end
 
+        CONTROL_RECORD(simul).COTS_control_records = OUTPUTS(simul).RESULT.COTS_records;
+    end
 end
+
+% Express shelter volume as total across all coral group in dm3 per m2
+reef_shelter_volume_absolute = sum(total_shelter_volume_per_taxa,4)/(META.total_area_cm2/1e4);
+
+% Express shelter volume relative to maximum possible value (ie, 1 tabular coral of the size of the cell in every cell)
+max_total_shelter_volume = META.grid_x_count*META.grid_y_count*exp(-8.32 + 1.50*log(META.cell_area_cm2));
+reef_shelter_volume_relative = sum(total_shelter_volume_per_taxa,4)/max_total_shelter_volume;
+reef_shelter_volume_relative(reef_shelter_volume_relative>1)=1;
+reef_shelter_volume_relative(reef_shelter_volume_relative<0)=0;
 
 % New (08/2021): only record COTS densities by yearly classes to reduce output size
 % COTS_densities = COTS_densities0(:,:,:,1:2:end)+COTS_densities0(:,:,:,2:2:end);
 % 09/2021: now just sum across all juveniles and across all adults
 if OPTIONS.doing_COTS == 1
-    COTS_juv_densities = sum(COTS_densities0(:,:,:,1:(META.COTS_adult_min_age-1)),4);
-    COTS_adult_densities = sum(COTS_densities0(:,:,:,META.COTS_adult_min_age:end),4);
+    COTS_juv_densities = sum(COTS_densities(:,:,:,1:(META.COTS_adult_min_age-1)),4);
+    COTS_adult_densities = sum(COTS_densities(:,:,:,META.COTS_adult_min_age:end),4);
 end
 
-clear OUTPUTS simul s COTS_densities0 NB_TIME_STEPS
+clear OUTPUTS simul s NB_TIME_STEPS
 
 save (OPTIONS.OutputFileName)

@@ -9,21 +9,16 @@ PARAMETERS
 META.nb_time_steps = nb_time_steps;
 
 %% Reef areas
-load('GBR_REEF_POLYGONS_2022.mat') 
-% New reef areas based on the 2D/3D surface areas of geomorphic classes down to 20m depth (Roelfsema et al. 2021 Rem. Sens.).
-% Selected classes are those likely dominated by corals (Roelfsema comm. pers.): Outer Reef flat | Reef Crest | Sheltered Reef Slope | Reef Slope
-% Five estimates of reef area (km2):
-% . Reference_Area_km2: reef area of the reference reef outline (GBR_REEF_FEATURES.shp). Previously named 'HabitatAreaKm2'
-% . Geom_2D_Area_km2: 2D geomorphic area from the 2021 GBRMPA-UQ mapping product (773 reefs had no value -> filled using Reference_Area_km2)
-% . GeomCH_2D_Area_km2: 2D geom. area only for 'Coral Habitat' classes (Rolefsema et al 2021). Missing values estimated from Geom_2D_Area_km2.
-% . Geom_3D_Area_km2: 3D geom. area from the 2021 GBRMPA-UQ mapping product (missing values estimated from Geom_2D_Area_km2)
-% . GeomCH_3D_Area_km2: 3D geom. area only for 'Coral Habitat' classes. Missing values estimated from Geom_3D_Area_km2
-% Now contains the UNIQUE_ID of the GBRMPA shapefile GBR_REEF_FEATURES.shp. GBRMPA reef names and ID checked by Caro.
+load('GBR_REEF_POLYGONS_2023.mat') % update 11/2022
+% New reef areas based on the 3D surface areas of geomorphic classes down to 20m depth (Roelfsema et al. 2021 Rem. Sens.).
+% Available for all geomorphic classes (Geom_total) and for those (Geom_CH) likely dominated by corals (Roelfsema et al. 2021): 
+% Outer Reef flat | Reef Crest | Sheltered Reef Slope | Reef Slope
+% Also contains reef specific estimates of UNGRAZABLE, a corrected assignment of shelf position (Caro) and zoning status (Tina)
  
 %% Reef selection
-% META.reef_ID = [1:3806]'; % Entire GBR
+META.reef_ID = [1:3806]'; % Entire GBR
 % META.reef_ID = GBR_REEFS.Reef_ID(GBR_REEFS.LAT<-15.4 & GBR_REEFS.LAT >-15.7); % Region around Moore reef
-META.reef_ID = GBR_REEFS.Reef_ID(GBR_REEFS.LAT<-15.76 & GBR_REEFS.LAT >-17.34); % Cairns region reduced (190 reefs) for restoration
+% META.reef_ID = GBR_REEFS.Reef_ID(GBR_REEFS.LAT<-15.76 & GBR_REEFS.LAT >-17.34); % Cairns region reduced (190 reefs) for restoration
 
 %% Simulating only the 4 reefs of the Moore Reef cluster:
 % META.reef_ID = [695 ; 697 ; 969 ; 970]; % Moore cluster (CANNOT RUN ONE REEF ONLY -> COTS CONTROL WILL CRASH)
@@ -38,7 +33,8 @@ META.reef_lat = GBR_REEFS.LAT(META.reef_ID); % needed for CoTS control
 META.reef_lon = GBR_REEFS.LON(META.reef_ID); % needed for CoTS control
 
 % Define which habitat area to use
-META.area_habitat = GBR_REEFS.GeomCH_3D_Area_km2(META.reef_ID);
+META.area_habitat = GBR_REEFS.Geom_CH_km2(META.reef_ID);
+% META.area_habitat = GBR_REEFS.GeomCH_3D_Area_km2(META.reef_ID);
 % META.area_habitat = GBR_REEFS.GeomCH_2D_Area_km2(META.reef_ID); % Just to align with IPMF (for the BCA)
 
 % Enlarge reef grids to deploy in specific sites (set to all reefs)
@@ -48,6 +44,11 @@ META.area_habitat = GBR_REEFS.GeomCH_3D_Area_km2(META.reef_ID);
 % For the BCA:
 % META.grid_x_count = 35; % number of grid cells along the x-edge
 % META.grid_y_count = 35; % number of grid cells along the y-edge
+
+% TODO: Grid size must be set as REEF(n).grid_size = 43*43;
+% First define the default grid size in PARAMETERS: REEF(n).grid_size = 20*20;
+% Then apply to all reefs in INITIALISATION
+% Then refine here those reefs that have different grid sizes
 
 %% Disturbances
 % NOTE: don't refine COTS parameters here because they will be erased by settings_COTS
@@ -65,8 +66,8 @@ META.deterministic_hurricane_mortality = 0; % option for generating deterministi
 
 META.doing_COTS = OPTIONS.doing_COTS ;
 META.doing_COTS_control = OPTIONS.doing_COTS_control ;
-META.report_COTS_control = 0 ; % Put 1 to record the detailed results of CoTS control (will create RESULT.COTS_records)
-META.randomize_initial_COTS_densities = 2 ; % Distri for random generation of COTS densities (based on CoCoNet averages)
+META.report_COTS_control = 1 ; % Put 1 to record the detailed results of CoTS control (will create RESULT.COTS_records)
+META.randomize_initial_COTS_densities = 1 ; % Distri for random generation of COTS densities (based on CoCoNet averages)
 % 1 for Gaussian, 2 for Poisson
 
 % Define the COTS initiation box
@@ -230,11 +231,13 @@ end
 MULTIPLE_REEF_SETUP
 
 %% REFINE BACKGROUND COTS DENSITY ON SPECIFIC REEFS
-for n=1:length(META.reef_COTS_INIT_BOX)
-    id_reef = find(META.reef_ID==META.reef_COTS_INIT_BOX(n));
-    
-    if isempty(id_reef) == 0
-        REEF(id_reef).COTS_background_density = META.COTS_background_density_INIT_BOX;
+if META.doing_COTS == 1
+    for n=1:length(META.reef_COTS_INIT_BOX)
+        id_reef = find(META.reef_ID==META.reef_COTS_INIT_BOX(n));
+        
+        if isempty(id_reef) == 0
+            REEF(id_reef).COTS_background_density = META.COTS_background_density_INIT_BOX;
+        end
     end
 end
 

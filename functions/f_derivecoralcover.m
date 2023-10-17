@@ -6,10 +6,10 @@
 % This function outputs a vector of colony sizes (cm2) for a given coral species 
 % c indicates which coral species is in use
 
-function colony_sizes = f_derivecoralcover(c,REEF,CORAL)
+function colony_sizes = f_derivecoralcover(c,REEFn,CORAL)
 
 % Calculate the desired total amount of coral cover (cm2) on grid
-initial_cover_cm2 = REEF.initial_coral_cover(c)*sum(REEF.substrate_SA_cm2);
+initial_cover_cm2 = REEFn.initial_coral_cover(c)*sum(REEFn.substrate_SA_cm2);
 % Note that sand is included in the substrate area
 
 maximum_size_cm2 = CORAL.adult_max_size(c); % note maximum size of corals is bounded by cell size in INITIALISATION.m

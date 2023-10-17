@@ -71,7 +71,7 @@ for s = 1:nb_coral_species % eaten_coral_cm2 has one value for each coral specie
         % Positive values in cumsum_coral indicate those living coral colonies that will
         % be removed until the the total area of coral is consumed
         
-        last_eaten = find(cumsum_coral<0,1,'first'); % the last eaten colony is the first to produce a negative differential
+        last_eaten = find(cumsum_coral <= 0,1,'first'); % the last eaten colony is the first to produce a negative differential
         % (the size of this colony overtakes the required total of areas consummed by COTs).
         % Here we assume this colony is entirely eaten, which makes the total effectively consumed a little bit higher than
         % expected (conservative assumption). As a result, there is no partial mortality due to COTs (they

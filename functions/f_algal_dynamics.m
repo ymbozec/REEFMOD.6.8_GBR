@@ -4,7 +4,9 @@
 %__________________________________________________________________________
 
 function [algal_cm2,last_surface_area_grazed] = f_algal_dynamics(algal_removal,ALGAL,total_coral_cm2, algal_cm2, ...
-    coral_reduce_macrogrowth, growth_rate, cell_area_cm2, convert_to_canopy, season, dictyota_declines_seasonally, grazable_cell,substrate_SA_cm2,environ)
+    coral_reduce_macrogrowth, growth_rate, all_cell_areas_cm2, convert_to_canopy, season, dictyota_declines_seasonally, grazable_cell,substrate_SA_cm2,environ)
+
+% 09/2022: all_cell_areas_cm2 = substrate_SA_cm2 except it takes 0 for all non-grazable cells (sand)
 
 % Just need the growth rates of Dict and Lob
 r_DICT = growth_rate(2,season+1) ;  % to be converted in cm2?
@@ -20,13 +22,13 @@ substrate_env_cm2= substrate_SA_cm2(environ(:,2)) + substrate_SA_cm2(environ(:,3
 % Simulate algal dynamics
 for t=1:ALGAL.nb_step_algal_dynamics
     
-    actual_algal_consumpt_pct = f_algal_removal(algal_cm2, algal_removal, ALGAL.feeding_prefs, sum(cell_area_cm2)) ;
-    % actual_algal_consumpt_pct gives the total amount (in %) of each alga to be removed based on their availability
+    actual_algal_consump = f_algal_removal(algal_cm2, algal_removal, ALGAL.feeding_prefs, sum(all_cell_areas_cm2)) ;
+    % actual_algal_consumption gives the total amount of each alga (as proportional area) to be removed based on their availability
     % Note that REEF.substrate_SA_cm2 is the surface area of the substrate underneath live corals
     % -> we use now the actual surface area of the reef instead of the planar area (META.total_area_cm2)
 
     % Converts in total amount of cm2 algae that can be consumed
-    max_fish_consump = actual_algal_consumpt_pct*sum(cell_area_cm2);
+    max_fish_consump = actual_algal_consump*sum(all_cell_areas_cm2);
     
     %%%%%%%%%%%%%%%%%% Set up grazing for every cell %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     r = uint16(randperm(length(list_cell)));  % randomize the order of cell to visit
@@ -41,7 +43,7 @@ for t=1:ALGAL.nb_step_algal_dynamics
     
     %%%%%%%%%%%%%%%%%% Remove LOBOPHORA due to grazing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % amount of dict sitting above lob already. Note max(x, 0) gives a 0 when x is negative
-    existing_colocation_cm2 = max(sum(algal_cm2,2) + total_coral_cm2 - cell_area_cm2,0); % max(x, 0) gives a 0 when x is negative
+    existing_colocation_cm2 = max(sum(algal_cm2,2) + total_coral_cm2 - all_cell_areas_cm2,0); % max(x, 0) gives a 0 when x is negative
     % where lobophora is eaten so is the dictyota that is with it
     algal_cm2(eaten_algal(:,3)==1,2) = max(algal_cm2(eaten_algal(:,3)==1,2) - existing_colocation_cm2(eaten_algal(:,3)==1),0) ;
     % all lobophora eaten so it turns to EAM
@@ -51,7 +53,7 @@ for t=1:ALGAL.nb_step_algal_dynamics
     
     %%%%%%%%%%%%%%%%%% Now process DICTYOTA grazing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Update the amount of dictyota which co-located with lobophora already
-    existing_colocation_cm2 = max(sum(algal_cm2,2) + total_coral_cm2 - cell_area_cm2,0); % max(x, 0) gives a 0 when x is negative
+    existing_colocation_cm2 = max(sum(algal_cm2,2) + total_coral_cm2 - all_cell_areas_cm2,0); % max(x, 0) gives a 0 when x is negative
     
     % check existing_colocation_cm2 with lob_over_dict_cm2 t see how big the difference is
     if (dictyota_declines_seasonally == 1 && season == 1)  %season = 1|0 -> winter|summer
@@ -86,7 +88,7 @@ for t=1:ALGAL.nb_step_algal_dynamics
     lob_overgrowth_cm2 =  ALGAL.margins_lob_overgrowth_cm2*lob_env_prop/0.6 ;
     
     % Adjust for available space
-    space_avail_cm2 = cell_area_cm2 - total_coral_cm2 - algal_cm2(:,3) - algal_cm2(:,2);
+    space_avail_cm2 = all_cell_areas_cm2 - total_coral_cm2 - algal_cm2(:,3) - algal_cm2(:,2);
     lob_overgrowth_cm2(lob_overgrowth_cm2 > space_avail_cm2) = space_avail_cm2(lob_overgrowth_cm2 > space_avail_cm2);
     
     init_LOB_cm2 = algal_cm2(:,3);
@@ -99,12 +101,12 @@ for t=1:ALGAL.nb_step_algal_dynamics
     id_nongrazed = id_nongrazed.*grazable_cell;  % exclude non-grazable cells
     
     % Set up thick turf: expands quickly in the absence of grazing
-    init_TURF_cm2(id_nongrazed==1) = cell_area_cm2(id_nongrazed==1) - total_coral_cm2(id_nongrazed==1)...
+    init_TURF_cm2(id_nongrazed==1) = all_cell_areas_cm2(id_nongrazed==1) - total_coral_cm2(id_nongrazed==1)...
         - init_LOB_cm2(id_nongrazed==1) - init_DICT_cm2(id_nongrazed==1) ;
     
     % Set up algal settlement within TURF (use the same settlement rate for UMA; scale settlement down to available turf
     seeding = 0*init_TURF_cm2;
-    seeding(id_nongrazed==1) = 2*ALGAL.settlement_lob_cm2 * init_TURF_cm2(id_nongrazed==1)./cell_area_cm2(id_nongrazed==1) ;
+    seeding(id_nongrazed==1) = 2*ALGAL.settlement_lob_cm2 * init_TURF_cm2(id_nongrazed==1)./all_cell_areas_cm2(id_nongrazed==1) ;
     
     % Macroalgae can grow only in ungrazed cells
     id_growth=find(id_nongrazed==1 & init_TURF_cm2>0); % can grow only if ungrazed AND some turf is available 
@@ -140,7 +142,7 @@ for t=1:ALGAL.nb_step_algal_dynamics
         algal_cm2(id_nongrazed==1,1)=0 ; % Turn EAM into 0 in the non-grazed cells
         algal_cm2(id_growth,3) = lob_cm2;
         algal_cm2(id_growth,2) = dict_cm2;
-        algal_cm2(id_nongrazed==1,4) = ceil(cell_area_cm2(id_nongrazed==1) - total_coral_cm2(id_nongrazed==1)...
+        algal_cm2(id_nongrazed==1,4) = ceil(all_cell_areas_cm2(id_nongrazed==1) - total_coral_cm2(id_nongrazed==1)...
             - algal_cm2(id_nongrazed==1,2) - algal_cm2(id_nongrazed==1,3)) ;
              
         % Finally estimate true cover of DICT considering it can overtop LOB (but easier to process this here)

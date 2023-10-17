@@ -44,6 +44,7 @@ RESULT.algal_pct = zeros(META.nb_reefs, META.nb_time_steps+1, META.nb_algal_type
 RESULT.coral_settler_count = zeros(META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types);
 RESULT.coral_total_fecundity = zeros(META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types);
 RESULT.coral_larval_supply = zeros(META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types);
+RESULT.total_shelter_volume_per_taxa = zeros(META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types);
 
 if META.doing_clades == 1
     RESULT.clade_prop = zeros(META.nb_reefs, META.nb_time_steps+1, META.nb_coral_types);
@@ -63,7 +64,9 @@ end
 
 if META.doing_COTS==1
     RESULT.COTS_all_densities = zeros(META.nb_reefs, META.nb_time_steps+1, META.COTS_maximum_age);
+    RESULT.COTS_all_densities_predicted = zeros(META.nb_reefs, META.nb_time_steps+1, META.COTS_maximum_age); % predicted densities before replacement by obs 
     RESULT.COTS_total_perceived_density = zeros(META.nb_reefs, META.nb_time_steps+1);
+    RESULT.COTS_total_perceived_density_predicted = zeros(META.nb_reefs, META.nb_time_steps+1); % perceived density before replacement by observation
     RESULT.COTS_settler_densities = zeros(META.nb_reefs, META.nb_time_steps+1); % density of settlers before mortality (then become 6mo old recruits)
     RESULT.COTS_larval_supply = zeros(META.nb_reefs, META.nb_time_steps+1);
     RESULT.COTS_larval_output = zeros(META.nb_reefs, META.nb_time_steps+1);  % amount of larvae produced per reef (fecundity*area*survival)
@@ -174,20 +177,18 @@ for n = 1:META.nb_reefs % This must be done for every reef before time simulatio
     % Reminder: t=0 at initialization
     if META.doing_COTS == 1
         
-%         if REEF_COTS.densities_M(n,t+1) > -1 % if empirical estimate available
         if isnan(REEF_COTS.densities_M(n,t+1))==0  % if empirical observation is available
             
             switch META.randomize_initial_COTS_densities
                 
+                case 0 % Take the exact observed value             
+                    COTS_total_density = REEF_COTS.densities_M(n,1);
+                
                 case 1 % Gaussian generated from specified mean and SD (use SD=0 to force to the mean)
-                    
                     COTS_total_density = normrnd(REEF_COTS.densities_M(n,1),REEF_COTS.densities_SD(n,1));
-                    COTS_total_density(COTS_total_density<0)=0;
                     
                 case 2 % Poisson generated to avoid creating low densities (relative to SD)
-                    
                     COTS_total_density = poissrnd(REEF_COTS.densities_M(n,1));
-                    
             end
             
         else % otherwise we initialise with 0 CoTS
@@ -196,19 +197,28 @@ for n = 1:META.nb_reefs % This must be done for every reef before time simulatio
             
         end
         
+        % Set minimum to background density
+        COTS_total_density(COTS_total_density<REEF(n).COTS_background_density) = REEF(n).COTS_background_density;
+        
         % Initialise with reference pop structure in winter (already corrected for imperfect detection)
         % Density is number of CoTS per reef grid (400m2)
-        COTS_densities = COTS_total_density * META.COTS_init_age_distri_OUTBREAK(2,:) ;
-        mature_COTS_density = sum(COTS_densities(:,META.COTS_fecundity~=0),2);
+        COTS_all_densities = COTS_total_density * META.COTS_init_age_distri_OUTBREAK(2,:) ;
+        % Adjust for imperfect detectability
+        COTS_all_densities(META.COTS_adult_min_age:end) = COTS_all_densities(META.COTS_adult_min_age:end)./...
+            META.COTS_detectability(META.COTS_adult_min_age:end);
+        
+        mature_COTS_density = sum(COTS_all_densities(META.COTS_fecundity~=0),2);
         
         % Fertilization success (0-1) from number of mature CoTS per hectare (Babcock et al. 2014)
         fertilization_success = 0.14 * (convert_area_ha * mature_COTS_density).^0.61 ;
         fertilization_success(fertilization_success>0.9)=0.9;  %fertilization cap (max obtained by Babcock)
         
         % Population estimates at initialization (t=0)
-        RESULT.COTS_total_perceived_density(n,t+1) = sum(COTS_densities(META.COTS_adult_min_age:end).*META.COTS_detectability(META.COTS_adult_min_age:end));
-        RESULT.COTS_all_densities(n,t+1,:) = COTS_densities ;
-        RESULT.COTS_fecundity(n,t+1) = sum(COTS_densities.*META.COTS_fecundity).*fertilization_success ;
+        RESULT.COTS_total_perceived_density(n,t+1) = sum(COTS_all_densities(META.COTS_adult_min_age:end).*META.COTS_detectability(META.COTS_adult_min_age:end));
+        RESULT.COTS_total_perceived_density_predicted(n,t+1) = RESULT.COTS_total_perceived_density(n,t+1);
+        RESULT.COTS_all_densities(n,t+1,:) = COTS_all_densities ;
+        RESULT.COTS_all_densities_predicted(n,t+1,:) = COTS_all_densities ;
+        RESULT.COTS_fecundity(n,t+1) = sum(COTS_all_densities.*META.COTS_fecundity).*fertilization_success ;
         
     end
     
@@ -228,7 +238,7 @@ for n = 1:META.nb_reefs % This must be done for every reef before time simulatio
         % Was previously in f_hurricane_effect.m. See script for definition of parameters
         a = -3e-007;
         k_cat5 = 0.0551-a*((0.0007/(-2*a))^2);
-        relHurrMort = [0.0461 0.1183 0.2504 0.5677 1]; %e.g. a cat 4 has 57% of the impact as a cat 5
+        relHurrMort = [0.0461 0.1183 0.2504 0.5677 1]; %e.g. a cat 4 has 57% of the impact of a cat 5
         
         for t0=1:2:META.nb_time_steps
             
@@ -265,13 +275,16 @@ for n = 1:META.nb_reefs % This must be done for every reef before time simulatio
         
         living_planar_coral_cover_cm2 = metapop(n).coral(s).cover_cm2(metapop(n).coral(s).cover_cm2>0) ;
         RESULT.coral_pct2D(n,t+1,s) = 100*sum(living_planar_coral_cover_cm2)./sum(REEF(n).substrate_SA_cm2) ;
+                
+        % Total shelter volume (total volume of shelter in dm3 across all the colonies of a given group)
+        RESULT.total_shelter_volume_per_taxa(n,t+1,s) = f_estimate_shelter_volume(living_planar_coral_cover_cm2, CORAL.SV_a(s), CORAL.SV_b(s), CORAL.SV_rand(s));
         
         if META.doing_clades == 1
             living_coral_clades = metapop(n).coral(s).clade(metapop(n).coral(s).cover_cm2>0) ;
             RESULT.clade_prop(n,t+1,s) = nnz(living_coral_clades==1)/nnz(living_coral_clades);
         end
         
-        % Estimaton of living and dead carbonate volumes (per species)
+        % Estimation of living and dead carbonate volumes (per species)
         if META.doing_3D == 1
             living_coral_volume_cm3 = metapop(n).coral(s).volume_cm3(metapop(n).coral(s).cover_cm2>0) ;
             dead_coral_volume_cm3 = metapop(n).coral(s).volume_cm3(metapop(n).coral(s).cover_cm2<0) ;
@@ -286,7 +299,7 @@ for n = 1:META.nb_reefs % This must be done for every reef before time simulatio
             RESULT.coral_adol_count(n,t+1,s,:)=count.adol;
             RESULT.coral_adult_count(n,t+1,s,:)=count.adult;
         end
-        
+              
         % Record the ID max
         if sum(sum(metapop(n).coral(s).cover_cm2))~=0
             ID_colony_tracking(n,s) = max(max(metapop(n).coral(s).colony_ID));
@@ -434,7 +447,7 @@ for t = 1:META.nb_time_steps
     select_layer = RECORD.WQ_chronology(t) ;
 
     season = iseven(t); % 1 is winter, 0 is summer (first time step is summer)
-    
+
     if season == 0 % reproductive season is summer
         
         %% %%%%%%% ESTIMATE CORAL LARVAL SUPPLY FOR EVERY REEF %%%%%%%%%%%%%%%%%
@@ -633,60 +646,8 @@ for t = 1:META.nb_time_steps
         % COTS population at t was previously estimated by the model
         % (either initialized for t=0 or processed through demographics
         if META.doing_COTS == 1
-            
-            % Force outbreaks to stop after several years, otherwise outbreaks would only stop when there is no coral left
-            % while COTS populations could crash due to diseases (Pratchett 2001, Zann et al. 1990)
-            % If META.COTS_outbreak_duration is a vector of two scalars, outbreak duration is chosen at random between those two bounds;
-            % If META.COTS_outbreak_duration is a scalar then outbreak duration is fixed to that value
-            % (see settings_COTS.m)
-            
-            % First tests if at the start of time step t the density of 18+
-            % months COTS is above threshold for disease (ie, above outbreak threshold)
-            if RESULT.COTS_adult_densities(n,t) >= META.COTS_density_threshold_for_disease
-                    
-                % If that the case, track recent history of that density
-                if length(META.COTS_outbreak_duration)>1
-                    COTS_outbreak_duration = randi(META.COTS_outbreak_duration); % in years
-                else
-                    COTS_outbreak_duration = META.COTS_outbreak_duration;
-                end
-                
-                % Process die-back if outbreak has lasted the max duration
-                if t > 2*COTS_outbreak_duration+1
-                    
-%                     COTS_density_history = sum(RESULT.COTS_all_densities(n,(t-COTS_outbreak_duration*2):t,3:end),3);
-                    COTS_density_history = RESULT.COTS_adult_densities(n,(t-COTS_outbreak_duration*2):t);
-                    
-                    if min(COTS_density_history)>= META.COTS_density_threshold_for_disease
-                        % if COTS have been above the outbreak density threshold over the tested period
-                        % then population crashes due to disease - just leave CoTS recruits
-                        RESULT.COTS_all_densities(n,t, META.COTS_dieback_classes)=REEF(n).COTS_background_density * ...
-                            RESULT.COTS_all_densities(n,t,META.COTS_dieback_classes)/sum(RESULT.COTS_all_densities(n,t,META.COTS_dieback_classes)) ;
-                        % RESULT.COTS_larval_supply(n,t) = 0 ; % prevent settlement if disease
-                    end
-                end
-            end
-                         
-            % If forcing of CoTS density is available, then erase the predicted pop
-%             if t > 1 && REEF_COTS.densities_M(n,t) > -1 % if empirical estimate available (otherwise do nothing)
-%                 %(starts at t=2 to not override initial conditions)
-            if t> 1 && isnan(REEF_COTS.densities_M(n,t))==0  % if empirical observation is available (otherwise do nothing)
-                %(starts at t=2 to not override initial conditions)
-                
-                COTS_total_density = normrnd(REEF_COTS.densities_M(n,t),REEF_COTS.densities_SD(n,t));
-                % COTS_total_density = poissrnd(25*REEF_COTS.densities_M(n,t))/25;
-                COTS_total_density(COTS_total_density<0)=0;
-                % COTS_densities = COTS_total_density * META.COTS_init_age_distri_OUTBREAK(season+1,:) ;
-                COTS_densities = COTS_total_density * META.COTS_init_age_distri_OUTBREAK(2-season,:) ;
-                
-                RESULT.COTS_all_densities(n,t,:) = COTS_densities ;
-                RESULT.COTS_total_perceived_density(n,t) = sum(COTS_densities(1,META.COTS_adult_min_age:end).*META.COTS_detectability(META.COTS_adult_min_age:end));
-                RESULT.COTS_adult_densities(n,t) = sum(RESULT.COTS_all_densities(n,t,META.COTS_adult_min_age:end),3); % for CoTS control
-                
-                % Note: we populate at t because this is CoTS population before the processing of mortality
-            end
-                 
-            
+
+            % 1) First we process COTS dynamics (mortality) and consumption based on densities at t
             % Add COTS recruits before processing CoTS pop dyn
             if season == 0 % Only recruit in summer
                 RESULT.COTS_settler_densities(n,t) = META.COTS_BH_alpha*(RESULT.COTS_larval_supply(n,t)/(META.COTS_BH_beta + RESULT.COTS_larval_supply(n,t)));
@@ -694,8 +655,6 @@ for t = 1:META.nb_time_steps
                 RESULT.COTS_settler_densities(n,t) = 0;
             end
             
-            
-            % Then process COTS dynamics (mortality) and predation
             COTS_feeding_rates = META.COTS_feeding_rates(season+1,:); % current feeding rates (seasonal)
                            
             [metapop(n).coral, metapop(n).algal, NEW_COTS_densities ,total_coral_loss_COTS] = f_apply_COTS_predation(metapop(n).coral, metapop(n).algal,...
@@ -708,11 +667,94 @@ for t = 1:META.nb_time_steps
             fertilization_success(fertilization_success>0.9)=0.9;  %fertilization cap (max obtained by Babcock)
             
             % Population estimates at the end of t (ie, t+1)
-            RESULT.COTS_total_perceived_density(n,t+1) = sum(NEW_COTS_densities(1,META.COTS_adult_min_age:end).*META.COTS_detectability(META.COTS_adult_min_age:end));
             RESULT.COTS_all_densities(n,t+1,:) = NEW_COTS_densities ;
+            RESULT.COTS_total_perceived_density(n,t+1) = sum(NEW_COTS_densities(1,META.COTS_adult_min_age:end).*META.COTS_detectability(META.COTS_adult_min_age:end));
             RESULT.COTS_adult_densities(n,t+1) = sum(RESULT.COTS_all_densities(n,t+1,META.COTS_adult_min_age:end),3); % for CoTS control
             RESULT.COTS_fecundity(n,t+1) = sum(NEW_COTS_densities.*META.COTS_fecundity).*fertilization_success ;
             RECORD.coral_pct2D_lost_COTS(n,t,:) = 100*total_coral_loss_COTS/sum(REEF(n).substrate_SA_cm2);  %now per species
+            
+            % 2) Force outbreaks to stop after several years, otherwise outbreaks would only stop when there is no coral left
+            % while COTS populations could crash due to diseases (Pratchett 2001, Zann et al. 1990)
+            % Note the crash would be only effective at t+1, ie, CoTS damage still occur under the current density
+            % If META.COTS_outbreak_duration is a vector of two scalars, outbreak duration is chosen at random between those two bounds;
+            % If META.COTS_outbreak_duration is a scalar then outbreak duration is fixed to that value
+            % (see settings_COTS.m)
+            
+            % First tests if at the start of time step t the density of 18+
+            % months COTS is above threshold for disease (ie, above outbreak threshold)
+            if RESULT.COTS_adult_densities(n,t+1) >= META.COTS_density_threshold_for_disease
+                    
+                % If that the case, set outbreak duration (fixed for all reefs or at random for this reef and time step)
+                if length(META.COTS_outbreak_duration)>1
+                    COTS_outbreak_duration = randi(META.COTS_outbreak_duration); % in years
+                else
+                    COTS_outbreak_duration = META.COTS_outbreak_duration;
+                end
+                
+                % Track adult density over the set outbreak duration
+                if t > 2*COTS_outbreak_duration+1 % (prevents looking too far back at the start of the run)
+                    
+                    COTS_density_history = RESULT.COTS_adult_densities(n,(t-COTS_outbreak_duration*2):t+1);
+                    
+                    % Process die-back due to disease
+                    if min(COTS_density_history)>= META.COTS_density_threshold_for_disease
+                        % if COTS have been above the outbreak density threshold over the tested period
+                        % then population crashes due to disease - just leave CoTS recruits
+                        RESULT.COTS_all_densities(n,t+1, META.COTS_dieback_classes)=REEF(n).COTS_background_density * ...
+                            RESULT.COTS_all_densities(n,t+1,META.COTS_dieback_classes)/sum(RESULT.COTS_all_densities(n,t+1,META.COTS_dieback_classes)) ;
+                        RESULT.COTS_total_perceived_density(n,t+1) = sum(squeeze(RESULT.COTS_all_densities(n,t+1,META.COTS_adult_min_age:end)).*...
+                            transpose(META.COTS_detectability(META.COTS_adult_min_age:end)));
+                        RESULT.COTS_adult_densities(n,t+1) = sum(RESULT.COTS_all_densities(n,t+1,META.COTS_adult_min_age:end),3); % for CoTS control
+                        % Note the outcome of fecundity is kept so that CoTS larvae are produced and disperse before the die-back
+                    end
+                end
+            end
+            
+            % Store model predictions before replacement by observations
+            RESULT.COTS_all_densities_predicted(n,t+1,:) = RESULT.COTS_all_densities(n,t+1,:);
+            RESULT.COTS_total_perceived_density_predicted(n,t+1) = RESULT.COTS_total_perceived_density(n,t+1);
+            
+            % 3) If forcing of CoTS density is available, then erase the predicted population
+            % Update Dec 2022: now placed after mortality and consumption so that the model tracks the same value as the observation
+            % Erase the prediction with the observation, except for recruits (keep the prediction)
+            if isnan(REEF_COTS.densities_M(n,t+1))==0  % if empirical observation is available (otherwise do nothing)
+                
+                switch META.randomize_initial_COTS_densities
+                    
+                    case 0 % Take the exact observed value
+                        COTS_total_density = REEF_COTS.densities_M(n,t+1);
+                        
+                    case 1 % Gaussian generated from specified mean and SD (use SD=0 to force to the mean)
+                        COTS_total_density = normrnd(REEF_COTS.densities_M(n,t+1),REEF_COTS.densities_SD(n,t+1));
+                        
+                    case 2 % Poisson generated to avoid creating low densities (relative to SD)
+                        COTS_total_density = poissrnd(REEF_COTS.densities_M(n,t+1));
+                end
+                
+                % Set minimum to background density
+                COTS_total_density(COTS_total_density<REEF(n).COTS_background_density)=REEF(n).COTS_background_density;
+                COTS_all_densities = COTS_total_density * META.COTS_init_age_distri_OUTBREAK(2-season,:) ;
+                
+                % Adjust for imperfect detectability
+                COTS_all_densities(META.COTS_adult_min_age:end) = COTS_all_densities(META.COTS_adult_min_age:end)./...
+                    META.COTS_detectability(META.COTS_adult_min_age:end);
+                
+                % Then store at t+1 -> these will be different than COTS_all_densities_predicted
+                RESULT.COTS_all_densities(n,t+1,3:end) = COTS_all_densities(3:end) ; % Keep the predicted recruits/juveniles
+                RESULT.COTS_total_perceived_density(n,t+1) = sum(COTS_all_densities(META.COTS_adult_min_age:end).*...
+                    META.COTS_detectability(META.COTS_adult_min_age:end));
+                RESULT.COTS_adult_densities(n,t+1) = sum(COTS_all_densities(META.COTS_adult_min_age:end)); % for CoTS control
+                
+                % Recalculate reproductive outputs based on the observed population
+                mature_COTS_density = sum(COTS_all_densities(META.COTS_fecundity~=0),2);
+                
+                % Fertilization success (0-1) from number of mature CoTS per hectare (Babcock et al. 2014)
+                fertilization_success = 0.14 * (convert_area_ha * mature_COTS_density).^0.61 ;
+                fertilization_success(fertilization_success>0.9)=0.9;  %fertilization cap (max obtained by Babcock)
+                
+                RESULT.COTS_fecundity(n,t+1) = sum(COTS_all_densities.*META.COTS_fecundity).*fertilization_success ;
+                
+            end
             
         end
         
@@ -1019,6 +1061,9 @@ for t = 1:META.nb_time_steps
             living_planar_coral_cover_cm2 = metapop(n).coral(s).cover_cm2(metapop(n).coral(s).cover_cm2>0) ;
             RESULT.coral_pct2D(n,t+1,s) = 100*sum(living_planar_coral_cover_cm2)./sum(REEF(n).substrate_SA_cm2)  ;
             
+            % Total shelter volume (total volume of shelter in dm3 across all the colonies of a given group)
+            RESULT.total_shelter_volume_per_taxa(n,t+1,s) = f_estimate_shelter_volume(living_planar_coral_cover_cm2, CORAL.SV_a(s), CORAL.SV_b(s), CORAL.SV_rand(s));
+            
             if META.doing_clades == 1
                 living_coral_clades = metapop(n).coral(s).clade(metapop(n).coral(s).cover_cm2>0) ;
                 RESULT.clade_prop(n,t+1,s) = nnz(living_coral_clades==1)/nnz(living_coral_clades);
@@ -1195,6 +1240,7 @@ for t = 1:META.nb_time_steps
     %%%% COTS control (Karlo & Caro's code 2020-21)
     %%%% --------------------------------------------------------------
     %%New code with COTS_control_CSIRO function
+    % Update Dec 2022 -> no need to make it operating at t+1 because t is already incremented in f_COTS_control_CSIRO
     if META.doing_COTS == 1 && META.doing_COTS_control == 1
         if t >= META.COTS_control_start
             
@@ -1207,6 +1253,10 @@ for t = 1:META.nb_time_steps
             if META.report_COTS_control == 0 && isfield(RESULT,{'COTS_records'}) == 1 % if not interested by the detailed results of culling
                 RESULT=rmfield(RESULT,'COTS_records'); % then delete them
             end
+            
+           % Need to update the perceived density after control
+           RESULT.COTS_total_perceived_density(:,t+1) = sum(squeeze(RESULT.COTS_all_densities(:,t+1,META.COTS_adult_min_age:end)).*...
+              META.COTS_detectability(ones(1,META.nb_reefs), META.COTS_adult_min_age:end),2);
         end
     end
     

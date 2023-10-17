@@ -145,7 +145,8 @@ total_mortality = sum(sum(id_dead))/sum(sum(id1));
 id2 = id1 - id_dead ;
 rand_mort2 = rand(size(id2)) ; % Generates random probability for adol + adults
 
-prob_partial_mortality = id2.*(1-(1-sensitivity_bleaching.*MORT).^bleaching_partial_offset);
+prob_partial_mortality = id2.*(1-(1-prob_initial_mortality).^bleaching_partial_offset); % May 2023 -> use initial mortality which is already capped to 1
+% prob_partial_mortality = id2.*(1-(1-sensitivity_bleaching.*MORT).^bleaching_partial_offset);
 % prob_partial_mortality = id2.* sensitivity_bleaching .* MORT * bleaching_partial_offset;
 
 id_part = id2 ;

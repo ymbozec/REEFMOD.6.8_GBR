@@ -30,7 +30,9 @@ adult_relfitness = F_list(I);
 % Allometric relationship based on Hall and Hughes 1996:
 % Egg volume = exp(a+b*log(size))
 
-all_egg_volumes = exp(a + b*log(adult_relfitness.*adult_coral_sizes)) ; % mm3 of eggs produced by each colony
+% all_egg_volumes = exp(a + b*log(adult_relfitness.*adult_coral_sizes)) ; % mm3 of eggs produced by each colony
+% Correction 29/09/2022: logs in Hall&Hughes were log10, not natural logs!!
+% Also, makes more sense to apply relative fitness on number of eggs rather than colony size (log...)
+all_egg_volumes = adult_relfitness.*(10.^(a + b*log10(adult_coral_sizes))) ; % mm3 of eggs produced by each colony
 
 fecundity = floor(sum(sum(all_egg_volumes))/0.1) ; %0.1 mm3 is the average volume of an egg
-
